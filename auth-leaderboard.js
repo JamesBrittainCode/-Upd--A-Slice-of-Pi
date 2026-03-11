@@ -8,6 +8,10 @@ const authOverlay = document.getElementById("auth-overlay");
 const signInGoogleButton = document.getElementById("btn-signin-google");
 const signOutButton = document.getElementById("btn-signout");
 const authControls = document.getElementById("auth-controls");
+const yourScoreCard = document.getElementById("your-score-card");
+const yourBestAttempts = document.getElementById("your-best-attempts");
+const yourBestTime = document.getElementById("your-best-time");
+const downloadScoreButton = document.getElementById("btn-download-score");
 
 const leaderboardStatus = document.getElementById("leaderboard-status");
 const leaderboardList = document.getElementById("leaderboard-list");
@@ -75,6 +79,125 @@ const formatDuration = (ms) => {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = (totalSeconds % 60).toFixed(2).padStart(5, "0");
   return `${minutes}:${seconds}`;
+};
+
+const downloadBlob = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+const canvasToPngBlob = (canvas) =>
+  new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), "image/png");
+  });
+
+const drawPieSliceWatermark = (ctx, { x, y, radius }) => {
+  ctx.save();
+  ctx.globalAlpha = 0.18;
+  ctx.fillStyle = "#ffffff";
+
+  const start = -Math.PI / 4;
+  const end = (Math.PI * 5) / 4;
+
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, radius, start, end, false);
+  ctx.closePath();
+  ctx.fill();
+
+  // Cut out a small triangle "missing slice"
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + radius * 0.9, y);
+  ctx.lineTo(x + radius * 0.55, y - radius * 0.55);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+};
+
+const renderScorePng = async ({ title, username, attempts, timeMs }) => {
+  const width = 1200;
+  const height = 675;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not supported");
+
+  // Background
+  const gradient = ctx.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, "#0b0b0f");
+  gradient.addColorStop(1, "#141423");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+
+  // Accent border
+  ctx.strokeStyle = "rgba(255,255,255,0.10)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(24, 24, width - 48, height - 48);
+
+  // Header
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.font = "700 52px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+  ctx.fillText(title, 70, 120);
+
+  ctx.fillStyle = "rgba(255,255,255,0.70)";
+  ctx.font = "500 22px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+  ctx.fillText("Score snapshot", 70, 160);
+
+  // Main card
+  const cardX = 70;
+  const cardY = 215;
+  const cardW = width - 140;
+  const cardH = 300;
+  ctx.fillStyle = "rgba(255,255,255,0.05)";
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(cardX, cardY, cardW, cardH, 18);
+  ctx.fill();
+  ctx.stroke();
+
+  // Username
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.font = "700 34px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+  ctx.fillText(username, cardX + 34, cardY + 72);
+
+  // Stats labels
+  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.font = "600 18px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+  ctx.fillText("Attempts", cardX + 34, cardY + 135);
+  ctx.fillText("Time", cardX + 34, cardY + 220);
+
+  // Stats values
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.font = "800 56px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+  ctx.fillText(String(attempts ?? "—"), cardX + 34, cardY + 190);
+  ctx.fillText(formatDuration(timeMs), cardX + 34, cardY + 275);
+
+  // Footer
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.font = "500 18px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+  const now = new Date();
+  ctx.fillText(now.toLocaleString(), cardX + 34, cardY + cardH - 28);
+
+  // Watermark
+  drawPieSliceWatermark(ctx, { x: width - 170, y: height - 140, radius: 90 });
+  ctx.fillStyle = "rgba(255,255,255,0.25)";
+  ctx.font = "700 22px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+  ctx.fillText("A Slice of Pi", width - 290, height - 55);
+
+  return canvas;
 };
 
 const renderLeaderboard = (entries) => {
@@ -224,7 +347,7 @@ const createRunTracker = ({ turbowarp, user, submitWin }) => {
   return () => window.clearInterval(intervalId);
 };
 
-const main = async () => {
+  const main = async () => {
   const config = await resolveConfig();
 
   if (!isSupabaseConfigured(config)) {
@@ -243,6 +366,7 @@ const main = async () => {
 
   let stopTracker = null;
   let stopRealtime = null;
+  let currentUserBest = null;
 
   const cleanup = () => {
     if (typeof stopTracker === "function") stopTracker();
@@ -250,6 +374,8 @@ const main = async () => {
     stopTracker = null;
     stopRealtime = null;
     renderLeaderboard([]);
+    currentUserBest = null;
+    if (yourScoreCard) yourScoreCard.hidden = true;
   };
 
   const submitWin = async ({ uid, username, attempts, timeMs }) => {
@@ -316,6 +442,31 @@ const main = async () => {
     setStatus(res.data?.length ? "" : "No wins yet — be the first!");
   };
 
+  const refreshCurrentUserBest = async (userId) => {
+    if (!userId) return;
+    const res = await supabase
+      .from("leaderboard")
+      .select("username,best_attempts,best_time_ms,updated_at")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (res.error) {
+      console.error("[leaderboard] user fetch error:", res.error);
+      return;
+    }
+
+    currentUserBest = res.data || null;
+    if (!yourScoreCard) return;
+    if (!currentUserBest) {
+      yourScoreCard.hidden = true;
+      return;
+    }
+
+    yourScoreCard.hidden = false;
+    if (yourBestAttempts) yourBestAttempts.textContent = String(currentUserBest.best_attempts ?? "—");
+    if (yourBestTime) yourBestTime.textContent = formatDuration(currentUserBest.best_time_ms);
+  };
+
   const startRealtime = () => {
     const channel = supabase
       .channel("leaderboard-realtime")
@@ -345,6 +496,7 @@ const main = async () => {
   const showSignedOutUI = () => {
     if (authOverlay) authOverlay.hidden = false;
     if (authControls) authControls.hidden = true;
+    if (yourScoreCard) yourScoreCard.hidden = true;
     setStatus("Sign in to play and see the live leaderboard.");
     cleanup();
     try {
@@ -365,6 +517,7 @@ const main = async () => {
 
     stopRealtime = startRealtime();
     refreshLeaderboard().catch((e) => console.error("[leaderboard] refresh error:", e));
+    refreshCurrentUserBest(user.id).catch((e) => console.error("[leaderboard] user refresh error:", e));
     stopTracker = createRunTracker({ turbowarp, user, submitWin });
   };
 
@@ -393,6 +546,44 @@ const main = async () => {
         location.reload();
       } catch (err) {
         console.error("[auth] sign-out error:", err);
+      }
+    });
+  }
+
+  if (downloadScoreButton) {
+    downloadScoreButton.addEventListener("click", async () => {
+      try {
+        downloadScoreButton.disabled = true;
+        const { data } = await supabase.auth.getUser();
+        const user = data.user;
+        if (!user) {
+          setStatus("Sign in to download your score.");
+          return;
+        }
+
+        await refreshCurrentUserBest(user.id);
+        if (!currentUserBest) {
+          setStatus("No saved win yet — win once to download.");
+          return;
+        }
+
+        const canvas = await renderScorePng({
+          title: "A Slice of Pi",
+          username: currentUserBest.username || usernameFromEmail(user.email) || "player",
+          attempts: currentUserBest.best_attempts,
+          timeMs: currentUserBest.best_time_ms,
+        });
+        const blob = await canvasToPngBlob(canvas);
+        if (!blob) throw new Error("Failed to generate PNG");
+
+        const safeUser = (currentUserBest.username || "player").replace(/[^a-z0-9_-]+/gi, "-");
+        const filename = `slice-of-pi-score-${safeUser}.png`;
+        downloadBlob(blob, filename);
+      } catch (e) {
+        console.error("[download] error:", e);
+        setStatus("Couldn’t generate PNG.");
+      } finally {
+        downloadScoreButton.disabled = false;
       }
     });
   }
