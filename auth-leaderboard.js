@@ -133,6 +133,7 @@ const renderScorePng = async ({ title, username, attempts, timeMs }) => {
 
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas not supported");
+  ctx.textBaseline = "alphabetic";
 
   // Background
   const gradient = ctx.createLinearGradient(0, 0, width, height);
@@ -156,10 +157,10 @@ const renderScorePng = async ({ title, username, attempts, timeMs }) => {
   ctx.fillText("Score snapshot", 70, 160);
 
   // Main card
-  const cardX = 70;
-  const cardY = 215;
-  const cardW = width - 140;
-  const cardH = 300;
+  const cardW = 900;
+  const cardH = 340;
+  const cardX = Math.round((width - cardW) / 2);
+  const cardY = 205;
   ctx.fillStyle = "rgba(255,255,255,0.05)";
   ctx.strokeStyle = "rgba(255,255,255,0.12)";
   ctx.lineWidth = 2;
@@ -183,19 +184,19 @@ const renderScorePng = async ({ title, username, attempts, timeMs }) => {
   ctx.fillStyle = "rgba(255,255,255,0.95)";
   ctx.font = "800 56px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
   ctx.fillText(String(attempts ?? "—"), cardX + 34, cardY + 190);
-  ctx.fillText(formatDuration(timeMs), cardX + 34, cardY + 275);
+  ctx.fillText(formatDuration(timeMs), cardX + 34, cardY + 290);
 
-  // Footer
+  // Timestamp (outside the card to avoid overlapping stats)
   ctx.fillStyle = "rgba(255,255,255,0.55)";
   ctx.font = "500 18px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
   const now = new Date();
-  ctx.fillText(now.toLocaleString(), cardX + 34, cardY + cardH - 28);
+  ctx.fillText(now.toLocaleString(), 70, height - 60);
 
   // Watermark
-  drawPieSliceWatermark(ctx, { x: width - 170, y: height - 140, radius: 90 });
+  drawPieSliceWatermark(ctx, { x: width - 160, y: height - 125, radius: 72 });
   ctx.fillStyle = "rgba(255,255,255,0.25)";
   ctx.font = "700 22px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
-  ctx.fillText("A Slice of Pi", width - 290, height - 55);
+  ctx.fillText("A Slice of Pi by James Brittain", width - 560, height - 55);
 
   return canvas;
 };
