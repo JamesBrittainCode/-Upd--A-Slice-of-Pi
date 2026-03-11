@@ -272,9 +272,18 @@ const getStageVariable = (vm, variableName) => {
   if (!variables) return null;
   for (const id of Object.keys(variables)) {
     const entry = variables[id];
-    if (!Array.isArray(entry) || entry.length < 2) continue;
-    const [name, value] = entry;
-    if (name === variableName) return { id, name, value };
+    if (Array.isArray(entry)) {
+      if (entry.length < 2) continue;
+      const [name, value] = entry;
+      if (name === variableName) return { id, name, value };
+      continue;
+    }
+
+    if (entry && typeof entry === "object") {
+      const name = entry.name;
+      const value = entry.value;
+      if (name === variableName) return { id, name, value };
+    }
   }
   return null;
 };
@@ -288,7 +297,7 @@ const startGameIfNeeded = (() => {
   };
 })();
 
-const createRunTracker = ({ turbowarp, user, submitWin }) => {
+const createRunTracker = ({ turbowarp, user, submitWin, onWin }) => {
   const vm = turbowarp.vm;
 
   let lastStatus = null;
@@ -330,6 +339,14 @@ const createRunTracker = ({ turbowarp, user, submitWin }) => {
         const attemptsForWin = Math.max(1, attempts);
         attempts = 0;
 
+        if (typeof onWin === "function") {
+          onWin({
+            username: usernameFromEmail(user.email) || "player",
+            attempts: attemptsForWin,
+            timeMs,
+          });
+        }
+
         await submitWin({
           uid: user.id,
           username: usernameFromEmail(user.email) || "player",
@@ -367,6 +384,7 @@ const createRunTracker = ({ turbowarp, user, submitWin }) => {
   let stopTracker = null;
   let stopRealtime = null;
   let currentUserBest = null;
+  let lastWinSnapshot = null;
 
   const cleanup = () => {
     if (typeof stopTracker === "function") stopTracker();
@@ -375,6 +393,7 @@ const createRunTracker = ({ turbowarp, user, submitWin }) => {
     stopRealtime = null;
     renderLeaderboard([]);
     currentUserBest = null;
+    lastWinSnapshot = null;
     if (yourScoreCard) yourScoreCard.hidden = true;
   };
 
@@ -458,7 +477,10 @@ const createRunTracker = ({ turbowarp, user, submitWin }) => {
     currentUserBest = res.data || null;
     if (!yourScoreCard) return;
     if (!currentUserBest) {
-      yourScoreCard.hidden = true;
+      // Keep the card visible while signed in; it will show last win (if any) or placeholders.
+      yourScoreCard.hidden = false;
+      if (yourBestAttempts) yourBestAttempts.textContent = "—";
+      if (yourBestTime) yourBestTime.textContent = "—";
       return;
     }
 
@@ -518,7 +540,28 @@ const createRunTracker = ({ turbowarp, user, submitWin }) => {
     stopRealtime = startRealtime();
     refreshLeaderboard().catch((e) => console.error("[leaderboard] refresh error:", e));
     refreshCurrentUserBest(user.id).catch((e) => console.error("[leaderboard] user refresh error:", e));
-    stopTracker = createRunTracker({ turbowarp, user, submitWin });
+    if (yourScoreCard) yourScoreCard.hidden = false;
+    stopTracker = createRunTracker({
+      turbowarp,
+      user,
+      submitWin: async (payload) => {
+        try {
+          await submitWin(payload);
+          await refreshLeaderboard();
+          await refreshCurrentUserBest(payload.uid);
+        } catch (e) {
+          console.error("[leaderboard] submit error:", e);
+          const message = typeof e?.message === "string" ? e.message : "Unknown error";
+          setStatus(`Couldn’t save score: ${message}`);
+        }
+      },
+      onWin: (snapshot) => {
+        lastWinSnapshot = snapshot;
+        if (yourScoreCard) yourScoreCard.hidden = false;
+        if (yourBestAttempts) yourBestAttempts.textContent = String(snapshot.attempts ?? "—");
+        if (yourBestTime) yourBestTime.textContent = formatDuration(snapshot.timeMs);
+      },
+    });
   };
 
   if (signInGoogleButton) {
@@ -562,21 +605,30 @@ const createRunTracker = ({ turbowarp, user, submitWin }) => {
         }
 
         await refreshCurrentUserBest(user.id);
-        if (!currentUserBest) {
+        const best = currentUserBest || null;
+        const snapshot = best
+          ? {
+              username: best.username || usernameFromEmail(user.email) || "player",
+              attempts: best.best_attempts,
+              timeMs: best.best_time_ms,
+            }
+          : lastWinSnapshot;
+
+        if (!snapshot) {
           setStatus("No saved win yet — win once to download.");
           return;
         }
 
         const canvas = await renderScorePng({
           title: "A Slice of Pi",
-          username: currentUserBest.username || usernameFromEmail(user.email) || "player",
-          attempts: currentUserBest.best_attempts,
-          timeMs: currentUserBest.best_time_ms,
+          username: snapshot.username || usernameFromEmail(user.email) || "player",
+          attempts: snapshot.attempts,
+          timeMs: snapshot.timeMs,
         });
         const blob = await canvasToPngBlob(canvas);
         if (!blob) throw new Error("Failed to generate PNG");
 
-        const safeUser = (currentUserBest.username || "player").replace(/[^a-z0-9_-]+/gi, "-");
+        const safeUser = (snapshot.username || "player").replace(/[^a-z0-9_-]+/gi, "-");
         const filename = `slice-of-pi-score-${safeUser}.png`;
         downloadBlob(blob, filename);
       } catch (e) {
