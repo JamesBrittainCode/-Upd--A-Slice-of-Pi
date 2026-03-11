@@ -164,15 +164,19 @@
       overflow: auto;
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
+      z-index: 2;
     }
     #app {
       right: var(--sidebar-width);
+      width: auto;
+      z-index: 1;
     }
     body.is-fullscreen #sidebar {
       display: none;
     }
     body.is-fullscreen #app {
       right: 0;
+      width: auto;
     }
     .sidebar-header {
       display: flex;

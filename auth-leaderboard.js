@@ -307,7 +307,8 @@ const main = async () => {
 
     if (res.error) {
       console.error("[leaderboard] fetch error:", res.error);
-      setStatus("Couldn’t load leaderboard (check Supabase RLS/policies).");
+      const message = typeof res.error.message === "string" ? res.error.message : "Unknown error";
+      setStatus(`Couldn’t load leaderboard: ${message}`);
       return;
     }
 

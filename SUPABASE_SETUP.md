@@ -62,6 +62,12 @@ using (auth.uid() = id)
 with check (auth.uid() = id);
 ```
 
+If you still see 401/403 errors, ensure the `authenticated` role has table privileges:
+
+```sql
+grant select, insert, update on table public.leaderboard to authenticated;
+```
+
 Optional (recommended) constraints:
 
 ```sql
