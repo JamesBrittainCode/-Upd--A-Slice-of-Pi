@@ -194,6 +194,9 @@
       font-size: 16px;
       font-weight: 600;
       letter-spacing: 0.2px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
     .sidebar-subtitle {
       font-size: 12px;
@@ -214,6 +217,9 @@
       cursor: pointer;
       user-select: none;
       -webkit-user-select: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
     .btn-primary {
       background: var(--btn-bg);
@@ -271,6 +277,28 @@
       color: var(--muted);
       text-align: right;
       padding-top: 2px;
+    }
+    .icon {
+      width: 18px;
+      height: 18px;
+      display: inline-block;
+      vertical-align: middle;
+      flex: 0 0 auto;
+    }
+    .icon.small {
+      width: 16px;
+      height: 16px;
+    }
+    .rank-badge {
+      width: 22px;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      margin-left: auto;
     }
     .lb-name {
       font-weight: 700;
@@ -356,7 +384,10 @@
   <aside id="sidebar" aria-label="Leaderboard">
     <div class="sidebar-header">
       <div>
-        <div class="sidebar-title">Leaderboard</div>
+        <div class="sidebar-title">
+          <svg class="icon" aria-hidden="true"><use href="#icon-trophy"></use></svg>
+          Leaderboard
+        </div>
         <div class="sidebar-subtitle" id="leaderboard-subtitle">Live best runs</div>
       </div>
       <div id="auth-controls" hidden>
@@ -370,7 +401,10 @@
         <div class="lb-pill">Time <b id="your-best-time">—</b></div>
       </div>
       <div class="card-actions">
-        <button class="btn btn-secondary" id="btn-download-score" type="button">Download PNG</button>
+        <button class="btn btn-secondary" id="btn-download-score" type="button">
+          <svg class="icon small" aria-hidden="true"><use href="#icon-download"></use></svg>
+          Download PNG
+        </button>
       </div>
       <div class="muted" style="margin-top:8px">Includes a watermark.</div>
     </div>
@@ -619,5 +653,35 @@
   </script>
 
   <script type="module" src="./auth-leaderboard.js"></script>
+
+  <!-- Inline SVG icon sprite -->
+  <svg width="0" height="0" style="position:absolute;left:-9999px;top:-9999px" aria-hidden="true" focusable="false">
+    <symbol id="icon-trophy" viewBox="0 0 24 24">
+      <defs>
+        <linearGradient id="trophyGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#FFD66B"/>
+          <stop offset="1" stop-color="#FF8A3D"/>
+        </linearGradient>
+      </defs>
+      <path fill="url(#trophyGrad)" d="M7 3h10v2h3v2c0 3.2-2 5.8-5 6.6A5.5 5.5 0 0 1 13 16v2h3v3H8v-3h3v-2a5.5 5.5 0 0 1-2-2.4C6 12.8 4 10.2 4 7V5h3V3Zm10 4V6h-1v3c0 .8-.1 1.6-.3 2.3 1.9-.8 3.3-2.8 3.3-4.3Zm-10 2V6H6v1c0 1.5 1.4 3.5 3.3 4.3C7.1 10.6 7 9.8 7 9Z"/>
+      <path fill="rgba(0,0,0,0.25)" d="M8 21h8v-1H8v1Zm3-5h2v2h-2v-2Z"/>
+    </symbol>
+
+    <symbol id="icon-download" viewBox="0 0 24 24">
+      <defs>
+        <linearGradient id="dlGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#6EE7FF"/>
+          <stop offset="1" stop-color="#A78BFA"/>
+        </linearGradient>
+      </defs>
+      <path fill="url(#dlGrad)" d="M12 3a1 1 0 0 1 1 1v9.6l2.3-2.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L11 13.6V4a1 1 0 0 1 1-1Z"/>
+      <path fill="rgba(255,255,255,0.85)" d="M5 19a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3a1 1 0 1 0-2 0v3H7v-3a1 1 0 1 0-2 0v3Z"/>
+    </symbol>
+
+    <symbol id="icon-medal" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M7 2h4l1 3 1-3h4l-3 6h-4L7 2Zm5 8a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z"/>
+      <path fill="rgba(0,0,0,0.22)" d="M12 12.3 13 15l2.8.1-2.2 1.6.8 2.7-2.4-1.5-2.4 1.5.8-2.7-2.2-1.6L11 15l1-2.7Z"/>
+    </symbol>
+  </svg>
 </body>
 </html>

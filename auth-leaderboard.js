@@ -210,7 +210,16 @@ const renderLeaderboard = (entries) => {
 
     const rank = document.createElement("div");
     rank.className = "lb-rank";
-    rank.textContent = String(index + 1);
+    const place = index + 1;
+    if (place <= 3) {
+      const colors = ["#F9C74F", "#BFC7D5", "#D08C60"];
+      const labels = ["1st place", "2nd place", "3rd place"];
+      rank.innerHTML = `<span class="rank-badge" title="${labels[index]}" style="color:${colors[index]}">
+        <svg class="icon small" aria-hidden="true"><use href="#icon-medal"></use></svg>
+      </span>`;
+    } else {
+      rank.textContent = String(place);
+    }
 
     const body = document.createElement("div");
 
