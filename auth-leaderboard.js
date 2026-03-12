@@ -15,7 +15,8 @@ const yourParty = document.getElementById("your-party");
 const resetGameButton = document.getElementById("btn-reset-game");
 
 const leaderboardStatus = document.getElementById("leaderboard-status");
-const leaderboardList = document.getElementById("leaderboard-list");
+const leaderboardListCarlton = document.getElementById("leaderboard-list-carlton");
+const leaderboardListGeneral = document.getElementById("leaderboard-list-general");
 const leaderboardSubtitle = document.getElementById("leaderboard-subtitle");
 
 const setStatus = (text) => {
@@ -200,9 +201,9 @@ const renderScorePng = async ({ title, username, attempts, timeMs }) => {
   return canvas;
 };
 
-const renderLeaderboard = (entries) => {
-  if (!leaderboardList) return;
-  leaderboardList.innerHTML = "";
+const renderLeaderboard = (listEl, entries) => {
+  if (!listEl) return;
+  listEl.innerHTML = "";
   for (const [index, entry] of entries.entries()) {
     const row = document.createElement("li");
     row.className = "lb-row";
@@ -252,7 +253,7 @@ const renderLeaderboard = (entries) => {
 
     row.appendChild(rank);
     row.appendChild(body);
-    leaderboardList.appendChild(row);
+    listEl.appendChild(row);
   }
 };
 
@@ -442,7 +443,8 @@ const main = async () => {
     if (typeof stopRealtime === "function") stopRealtime();
     stopTracker = null;
     stopRealtime = null;
-    renderLeaderboard([]);
+    renderLeaderboard(leaderboardListCarlton, []);
+    renderLeaderboard(leaderboardListGeneral, []);
     currentUserBest = null;
     lastWinSnapshot = null;
     if (yourScoreCard) yourScoreCard.hidden = true;
@@ -498,23 +500,37 @@ const main = async () => {
     if (upsert.error) throw upsert.error;
   };
 
-  const refreshLeaderboard = async () => {
-    const res = await supabase
-      .from("leaderboard")
-      .select("username,party,best_attempts,best_time_ms,updated_at")
-      .order("best_attempts", { ascending: true })
-      .order("best_time_ms", { ascending: true })
-      .limit(25);
+  const refreshLeaderboards = async () => {
+    const base = () =>
+      supabase
+        .from("leaderboard")
+        .select("username,party,best_attempts,best_time_ms,updated_at")
+        .order("best_attempts", { ascending: true })
+        .order("best_time_ms", { ascending: true })
+        .limit(25);
 
-    if (res.error) {
-      console.error("[leaderboard] fetch error:", res.error);
-      const message = typeof res.error.message === "string" ? res.error.message : "Unknown error";
+    const [carltonRes, generalRes] = await Promise.all([
+      base().eq("party", "Carlton"),
+      base().eq("party", "General"),
+    ]);
+
+    if (carltonRes.error || generalRes.error) {
+      console.error("[leaderboard] fetch error:", carltonRes.error || generalRes.error);
+      const message =
+        typeof (carltonRes.error || generalRes.error)?.message === "string"
+          ? (carltonRes.error || generalRes.error).message
+          : "Unknown error";
       setStatus(`Couldn’t load leaderboard: ${message}`);
       return;
     }
 
-    renderLeaderboard(res.data || []);
-    setStatus(res.data?.length ? "" : "No wins yet — be the first!");
+    const carltonRows = carltonRes.data || [];
+    const generalRows = generalRes.data || [];
+    renderLeaderboard(leaderboardListCarlton, carltonRows);
+    renderLeaderboard(leaderboardListGeneral, generalRows);
+
+    const total = carltonRows.length + generalRows.length;
+    setStatus(total ? "" : "No wins yet — be the first!");
   };
 
   const refreshCurrentUserBest = async (userId) => {
@@ -561,7 +577,7 @@ const main = async () => {
         "postgres_changes",
         { event: "*", schema: "public", table: "leaderboard" },
         () => {
-          refreshLeaderboard().catch((e) => console.error("[leaderboard] refresh error:", e));
+          refreshLeaderboards().catch((e) => console.error("[leaderboard] refresh error:", e));
         }
       )
       .subscribe((status) => {
@@ -571,7 +587,7 @@ const main = async () => {
       });
 
     const pollId = window.setInterval(() => {
-      refreshLeaderboard().catch((e) => console.error("[leaderboard] refresh error:", e));
+      refreshLeaderboards().catch((e) => console.error("[leaderboard] refresh error:", e));
     }, 15000);
 
     return () => {
@@ -606,7 +622,7 @@ const main = async () => {
     startGameIfNeeded(turbowarp);
 
     stopRealtime = startRealtime();
-    refreshLeaderboard().catch((e) => console.error("[leaderboard] refresh error:", e));
+    refreshLeaderboards().catch((e) => console.error("[leaderboard] refresh error:", e));
     refreshCurrentUserBest(user.id).catch((e) => console.error("[leaderboard] user refresh error:", e));
     if (yourScoreCard) yourScoreCard.hidden = false;
     stopTracker = createRunTracker({
@@ -619,7 +635,7 @@ const main = async () => {
             emailDomain,
             party: currentParty,
           });
-          await refreshLeaderboard();
+          await refreshLeaderboards();
           await refreshCurrentUserBest(payload.uid);
         } catch (e) {
           console.error("[leaderboard] submit error:", e);
