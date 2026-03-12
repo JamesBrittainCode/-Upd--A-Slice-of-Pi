@@ -327,8 +327,9 @@ const setStageVariable = (vm, variableName, value) => {
   return false;
 };
 
-const forceTutorialStartState = (vm) => {
-  // Workaround for project getting stuck in a non-tutorial state on load.
+const setInitialScratchVariables = (vm) => {
+  // Set the same initial values defined in assets/project.json.
+  // Intended for manual reset only; avoid overriding the project's normal loading flow.
   setStageVariable(vm, "GameStatus?", "Menu");
   setStageVariable(vm, "Tutorial?", "Awaiting");
   setStageVariable(vm, "Round#", 1);
@@ -603,7 +604,6 @@ const main = async () => {
     const username = usernameFromEmail(user.email);
     turbowarp.setUsername(username);
     startGameIfNeeded(turbowarp);
-    setTimeout(() => forceTutorialStartState(turbowarp.vm), 250);
 
     stopRealtime = startRealtime();
     refreshLeaderboard().catch((e) => console.error("[leaderboard] refresh error:", e));
@@ -721,8 +721,8 @@ const main = async () => {
       try {
         const turbowarp = await waitForTurbowarp();
         turbowarp.stop();
+        setInitialScratchVariables(turbowarp.vm);
         turbowarp.start();
-        setTimeout(() => forceTutorialStartState(turbowarp.vm), 250);
       } catch (e) {
         console.error("[reset] error:", e);
       }
