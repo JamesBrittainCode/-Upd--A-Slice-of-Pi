@@ -25,6 +25,7 @@ Run this in **SQL Editor**:
 create table if not exists public.leaderboard (
   id uuid primary key references auth.users (id) on delete cascade,
   username text not null,
+  party text not null default 'General',
   best_attempts integer not null,
   best_time_ms integer not null,
   email_domain text,
@@ -74,7 +75,22 @@ Optional (recommended) constraints:
 alter table public.leaderboard
   add constraint best_attempts_range check (best_attempts between 1 and 999),
   add constraint best_time_ms_range check (best_time_ms between 0 and 86400000),
-  add constraint username_len check (char_length(username) between 1 and 50);
+  add constraint username_len check (char_length(username) between 1 and 50),
+  add constraint party_len check (char_length(party) between 1 and 40);
+```
+
+## Party assignment
+
+The site automatically assigns a “party” based on email domain:
+
+- `@battlegroundps.org` → `Carlton`
+- everyone else → `General`
+
+If you already created the table before adding party support, run:
+
+```sql
+alter table public.leaderboard add column if not exists party text not null default 'General';
+alter table public.leaderboard add constraint party_len check (char_length(party) between 1 and 40);
 ```
 
 ## 5) (Optional) Enable Realtime for instant updates
@@ -103,4 +119,3 @@ Set these in Vercel → Project → Settings → Environment Variables:
 
 - `SUPABASE_URL` (Supabase Project URL)
 - `SUPABASE_ANON_KEY` (Supabase anon public key)
-- `ALLOWED_EMAIL_DOMAIN` (optional, e.g. `myschool.edu`)

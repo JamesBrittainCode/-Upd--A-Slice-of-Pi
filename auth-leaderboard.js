@@ -1,7 +1,6 @@
 import {
   supabaseAnonKey as supabaseAnonKeyFallback,
   supabaseUrl as supabaseUrlFallback,
-  allowedEmailDomain as allowedEmailDomainFallback,
 } from "./supabase-config.js";
 
 const authOverlay = document.getElementById("auth-overlay");
@@ -12,6 +11,7 @@ const yourScoreCard = document.getElementById("your-score-card");
 const yourBestAttempts = document.getElementById("your-best-attempts");
 const yourBestTime = document.getElementById("your-best-time");
 const downloadScoreButton = document.getElementById("btn-download-score");
+const yourParty = document.getElementById("your-party");
 
 const leaderboardStatus = document.getElementById("leaderboard-status");
 const leaderboardList = document.getElementById("leaderboard-list");
@@ -40,15 +40,10 @@ const resolveConfig = async () => {
     (runtime?.supabaseUrl && String(runtime.supabaseUrl)) || supabaseUrlFallback || "";
   const supabaseAnonKey =
     (runtime?.supabaseAnonKey && String(runtime.supabaseAnonKey)) || supabaseAnonKeyFallback || "";
-  const allowedEmailDomain =
-    (runtime?.allowedEmailDomain && String(runtime.allowedEmailDomain)) ||
-    allowedEmailDomainFallback ||
-    "";
 
   return {
     supabaseUrl,
     supabaseAnonKey,
-    allowedEmailDomain,
   };
 };
 
@@ -71,6 +66,9 @@ const emailDomainFromEmail = (email) => {
   if (at < 0) return null;
   return email.slice(at + 1).toLowerCase();
 };
+
+const partyFromEmailDomain = (domain) =>
+  domain === "battlegroundps.org" ? "Carlton" : "General";
 
 const formatDuration = (ms) => {
   if (!Number.isFinite(ms) || ms < 0) return "—";
@@ -226,6 +224,13 @@ const renderLeaderboard = (entries) => {
     const name = document.createElement("div");
     name.className = "lb-name";
     name.textContent = entry.username || "player";
+    const party = entry.party || "General";
+    if (party) {
+      const badge = document.createElement("span");
+      badge.className = `party-badge${party === "Carlton" ? " carlton" : ""}`;
+      badge.textContent = party;
+      name.appendChild(badge);
+    }
 
     const stats = document.createElement("div");
     stats.className = "lb-stats";
@@ -374,7 +379,7 @@ const createRunTracker = ({ turbowarp, user, submitWin, onWin }) => {
   return () => window.clearInterval(intervalId);
 };
 
-  const main = async () => {
+const main = async () => {
   const config = await resolveConfig();
 
   if (!isSupabaseConfigured(config)) {
@@ -395,6 +400,7 @@ const createRunTracker = ({ turbowarp, user, submitWin, onWin }) => {
   let stopRealtime = null;
   let currentUserBest = null;
   let lastWinSnapshot = null;
+  let currentParty = "General";
 
   const cleanup = () => {
     if (typeof stopTracker === "function") stopTracker();
@@ -405,17 +411,21 @@ const createRunTracker = ({ turbowarp, user, submitWin, onWin }) => {
     currentUserBest = null;
     lastWinSnapshot = null;
     if (yourScoreCard) yourScoreCard.hidden = true;
+    if (yourParty) {
+      yourParty.textContent = "General";
+      yourParty.classList.remove("carlton");
+    }
   };
 
-  const submitWin = async ({ uid, username, attempts, timeMs }) => {
+  const submitWin = async ({ uid, username, attempts, timeMs, emailDomain, party }) => {
     if (!uid) return;
     if (!Number.isFinite(attempts) || attempts < 1) return;
     if (!Number.isFinite(timeMs) || timeMs === null) return;
 
-    const emailDomain = emailDomainFromEmail((await supabase.auth.getUser()).data.user?.email);
     const next = {
       id: uid,
       username,
+      party: party || "General",
       best_attempts: Math.trunc(attempts),
       best_time_ms: Math.trunc(timeMs),
       email_domain: emailDomain || null,
@@ -444,6 +454,7 @@ const createRunTracker = ({ turbowarp, user, submitWin, onWin }) => {
       : {
           id: uid,
           username,
+          party: party || "General",
           email_domain: emailDomain || null,
           updated_at: new Date().toISOString(),
         };
@@ -455,7 +466,7 @@ const createRunTracker = ({ turbowarp, user, submitWin, onWin }) => {
   const refreshLeaderboard = async () => {
     const res = await supabase
       .from("leaderboard")
-      .select("username,best_attempts,best_time_ms,updated_at")
+      .select("username,party,best_attempts,best_time_ms,updated_at")
       .order("best_attempts", { ascending: true })
       .order("best_time_ms", { ascending: true })
       .limit(25);
@@ -475,7 +486,7 @@ const createRunTracker = ({ turbowarp, user, submitWin, onWin }) => {
     if (!userId) return;
     const res = await supabase
       .from("leaderboard")
-      .select("username,best_attempts,best_time_ms,updated_at")
+      .select("username,party,best_attempts,best_time_ms,updated_at")
       .eq("id", userId)
       .maybeSingle();
 
@@ -491,12 +502,21 @@ const createRunTracker = ({ turbowarp, user, submitWin, onWin }) => {
       yourScoreCard.hidden = false;
       if (yourBestAttempts) yourBestAttempts.textContent = "—";
       if (yourBestTime) yourBestTime.textContent = "—";
+      if (yourParty) {
+        yourParty.textContent = currentParty;
+        yourParty.classList.toggle("carlton", currentParty === "Carlton");
+      }
       return;
     }
 
     yourScoreCard.hidden = false;
     if (yourBestAttempts) yourBestAttempts.textContent = String(currentUserBest.best_attempts ?? "—");
     if (yourBestTime) yourBestTime.textContent = formatDuration(currentUserBest.best_time_ms);
+    if (yourParty) {
+      const party = currentUserBest.party || currentParty;
+      yourParty.textContent = party;
+      yourParty.classList.toggle("carlton", party === "Carlton");
+    }
   };
 
   const startRealtime = () => {
@@ -543,6 +563,9 @@ const createRunTracker = ({ turbowarp, user, submitWin, onWin }) => {
     if (authControls) authControls.hidden = false;
     setStatus("Loading leaderboard…");
 
+    const emailDomain = emailDomainFromEmail(user.email);
+    currentParty = partyFromEmailDomain(emailDomain);
+
     const username = usernameFromEmail(user.email);
     turbowarp.setUsername(username);
     startGameIfNeeded(turbowarp);
@@ -556,7 +579,11 @@ const createRunTracker = ({ turbowarp, user, submitWin, onWin }) => {
       user,
       submitWin: async (payload) => {
         try {
-          await submitWin(payload);
+          await submitWin({
+            ...payload,
+            emailDomain,
+            party: currentParty,
+          });
           await refreshLeaderboard();
           await refreshCurrentUserBest(payload.uid);
         } catch (e) {
@@ -570,6 +597,10 @@ const createRunTracker = ({ turbowarp, user, submitWin, onWin }) => {
         if (yourScoreCard) yourScoreCard.hidden = false;
         if (yourBestAttempts) yourBestAttempts.textContent = String(snapshot.attempts ?? "—");
         if (yourBestTime) yourBestTime.textContent = formatDuration(snapshot.timeMs);
+        if (yourParty) {
+          yourParty.textContent = currentParty;
+          yourParty.classList.toggle("carlton", currentParty === "Carlton");
+        }
       },
     });
   };
@@ -656,15 +687,6 @@ const createRunTracker = ({ turbowarp, user, submitWin, onWin }) => {
     const session = data.session;
     const user = session?.user || null;
     if (!user) {
-      showSignedOutUI();
-      return;
-    }
-
-    const emailDomain = emailDomainFromEmail(user.email);
-    const allowed = typeof config.allowedEmailDomain === "string" ? config.allowedEmailDomain.trim().toLowerCase() : "";
-    if (allowed && emailDomain !== allowed) {
-      setStatus(`Please sign in with a ${allowed} email.`);
-      await supabase.auth.signOut();
       showSignedOutUI();
       return;
     }

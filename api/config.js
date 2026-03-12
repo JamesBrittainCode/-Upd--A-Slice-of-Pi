@@ -4,15 +4,12 @@ module.exports = (req, res) => {
 
   const supabaseUrl = process.env.SUPABASE_URL || "";
   const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || "";
-  const allowedEmailDomain = process.env.ALLOWED_EMAIL_DOMAIN || "";
 
   res.statusCode = 200;
   res.end(
     JSON.stringify({
       supabaseUrl,
       supabaseAnonKey,
-      allowedEmailDomain,
     })
   );
 };
-

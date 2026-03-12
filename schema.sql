@@ -6,6 +6,7 @@ begin;
 create table if not exists public.leaderboard (
   id uuid primary key references auth.users (id) on delete cascade,
   username text not null,
+  party text not null default 'General',
   best_attempts integer not null,
   best_time_ms integer not null,
   email_domain text,
@@ -13,6 +14,9 @@ create table if not exists public.leaderboard (
 );
 
 alter table public.leaderboard enable row level security;
+
+-- If the table existed before party support, add the column.
+alter table public.leaderboard add column if not exists party text not null default 'General';
 
 do $$
 begin
@@ -45,6 +49,16 @@ begin
     alter table public.leaderboard
       add constraint username_len check (char_length(username) between 1 and 50);
   end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'party_len'
+      and conrelid = 'public.leaderboard'::regclass
+  ) then
+    alter table public.leaderboard
+      add constraint party_len check (char_length(party) between 1 and 40);
+  end if;
 end $$;
 
 -- Policies (idempotent: drop if exists then create)
@@ -73,4 +87,3 @@ with check (auth.uid() = id);
 grant select, insert, update on table public.leaderboard to authenticated;
 
 commit;
-

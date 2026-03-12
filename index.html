@@ -307,6 +307,25 @@
       margin-bottom: 6px;
       word-break: break-word;
     }
+    .party-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.8);
+      margin-left: 8px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .party-badge.carlton {
+      background: rgba(255, 77, 166, 0.14);
+      border-color: rgba(255, 77, 166, 0.35);
+      color: rgba(255, 208, 236, 0.95);
+    }
     .lb-stats {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -395,7 +414,7 @@
       </div>
     </div>
     <div id="your-score-card" class="card" hidden>
-      <div class="card-title">Your best</div>
+      <div class="card-title">Your best <span class="party-badge" id="your-party">General</span></div>
       <div class="your-score-grid">
         <div class="lb-pill">Attempts <b id="your-best-attempts">—</b></div>
         <div class="lb-pill">Time <b id="your-best-time">—</b></div>
