@@ -12,6 +12,7 @@ const yourBestAttempts = document.getElementById("your-best-attempts");
 const yourBestTime = document.getElementById("your-best-time");
 const downloadScoreButton = document.getElementById("btn-download-score");
 const yourParty = document.getElementById("your-party");
+const resetGameButton = document.getElementById("btn-reset-game");
 
 const leaderboardStatus = document.getElementById("leaderboard-status");
 const leaderboardList = document.getElementById("leaderboard-list");
@@ -303,6 +304,39 @@ const getStageVariable = (vm, variableName) => {
   return null;
 };
 
+const setStageVariable = (vm, variableName, value) => {
+  const stage = vm?.runtime?.getTargetForStage?.();
+  const variables = stage?.variables;
+  if (!variables) return false;
+  for (const id of Object.keys(variables)) {
+    const entry = variables[id];
+    if (Array.isArray(entry)) {
+      if (entry.length < 2) continue;
+      const [name] = entry;
+      if (name !== variableName) continue;
+      entry[1] = value;
+      return true;
+    }
+
+    if (entry && typeof entry === "object") {
+      if (entry.name !== variableName) continue;
+      entry.value = value;
+      return true;
+    }
+  }
+  return false;
+};
+
+const forceTutorialStartState = (vm) => {
+  // Workaround for project getting stuck in a non-tutorial state on load.
+  setStageVariable(vm, "GameStatus?", "Menu");
+  setStageVariable(vm, "Tutorial?", "Awaiting");
+  setStageVariable(vm, "Round#", 1);
+  setStageVariable(vm, "ClickNum#", 0);
+  setStageVariable(vm, "CorrectAnswers", 0);
+  setStageVariable(vm, "Time", 0);
+};
+
 const startGameIfNeeded = (() => {
   let started = false;
   return (turbowarp) => {
@@ -569,6 +603,7 @@ const main = async () => {
     const username = usernameFromEmail(user.email);
     turbowarp.setUsername(username);
     startGameIfNeeded(turbowarp);
+    setTimeout(() => forceTutorialStartState(turbowarp.vm), 250);
 
     stopRealtime = startRealtime();
     refreshLeaderboard().catch((e) => console.error("[leaderboard] refresh error:", e));
@@ -677,6 +712,19 @@ const main = async () => {
         setStatus("Couldn’t generate PNG.");
       } finally {
         downloadScoreButton.disabled = false;
+      }
+    });
+  }
+
+  if (resetGameButton) {
+    resetGameButton.addEventListener("click", async () => {
+      try {
+        const turbowarp = await waitForTurbowarp();
+        turbowarp.stop();
+        turbowarp.start();
+        setTimeout(() => forceTutorialStartState(turbowarp.vm), 250);
+      } catch (e) {
+        console.error("[reset] error:", e);
       }
     });
   }
