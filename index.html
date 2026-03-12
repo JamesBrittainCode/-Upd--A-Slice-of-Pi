@@ -300,6 +300,30 @@
       background: rgba(255, 255, 255, 0.06);
       margin-left: auto;
     }
+    #site-footer {
+      position: fixed;
+      left: 10px;
+      bottom: 8px;
+      z-index: 6;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.55);
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 999px;
+      padding: 6px 10px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      user-select: none;
+      -webkit-user-select: none;
+      pointer-events: none;
+      max-width: calc(100vw - 20px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    body.is-fullscreen #site-footer {
+      display: none;
+    }
     .lb-name {
       font-weight: 700;
       font-size: 13px;
@@ -399,6 +423,8 @@
 </head>
 <body>
   <div id="app"></div>
+
+  <div id="site-footer">Copyright © 2026 Slice of Pi by James Brittain - All Rights Reserved.</div>
 
   <aside id="sidebar" aria-label="Leaderboard">
     <div class="sidebar-header">
